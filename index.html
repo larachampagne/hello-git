@@ -1,17 +1,333 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exploring HTML and GitHub</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-    <title>Hello, world!</title>
-  </head>
-  <body>
-    <h1>Hello, world!</h1>
+    body {
+      background: #fdfaf3;
+      color: #2b2b2b;
+      font-family: Georgia, "Times New Roman", serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
 
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
-  </body>
+    h1 {
+      padding-top: 500px;
+      padding-left: 1rem;
+      padding-right: 1rem;
+      text-align: center;
+      font-size: clamp(2rem, 6vw, 4rem);
+      font-weight: normal;
+      line-height: 1.2;
+    }
+
+    /* Smaller screens: less space above the title */
+    @media (max-width: 768px), (max-height: 700px) {
+      h1 {
+        padding-top: 25vh;
+      }
+    }
+
+    .garden {
+      margin: 3rem 0 4rem;
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    #flowers {
+      font-family: "Courier New", Courier, monospace;
+      line-height: 1;
+      white-space: pre;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Exploring HTML and GitHub</h1>
+
+  <div class="garden" role="img" aria-label="Two flowers made of text characters swaying gently in the wind">
+    <pre id="flowers" aria-hidden="true"></pre>
+  </div>
+
+  <script>
+    // ===== SETTINGS =====
+    const COLS = 90;            // characters per line
+    const ROWS = 60;            // number of lines
+    const MAX_SIZE = 1000;      // max height and width of the drawing, in pixels
+    const CW = 0.6;             // width of one character compared to its height
+
+    const COLORS = {
+      petal: "#e0628a",
+      centerOut: "#e8a33d",
+      centerIn: "#9c4f22",
+      tulip: "#d94735",
+      stem: "#4f8a3c",
+      sepal: "#3f7a32",
+      leaf: "#6aa84f",
+      rib: "#3f7a32",
+      grass: "#8bbf6a"
+    };
+
+    // ===== WIND =====
+    // Always positive, so the flowers always lean right: the wind comes from the left.
+    // "x" adds a small delay, so the wind reaches things on the right a little later.
+    function wind(t, x) {
+      const tt = t - x * 0.03;
+      return 0.55
+        + 0.25 * Math.sin(0.7 * tt)
+        + 0.12 * Math.sin(1.6 * tt + 1.3)
+        + 0.06 * Math.sin(3.1 * tt + 0.4);
+    }
+
+    // ===== DRAWING HELPERS =====
+    let chars, colors;
+
+    function clearGrid() {
+      chars = Array.from({ length: ROWS }, () => Array(COLS).fill(" "));
+      colors = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    }
+
+    // Puts one character at a position measured in "em" units
+    function plot(x, y, ch, color) {
+      const col = Math.round(x / CW - 0.5);
+      const row = Math.round(y - 0.5);
+      if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return;
+      chars[row][col] = ch;
+      colors[row][col] = color;
+    }
+
+    // Chooses a line character that matches a direction (angle in radians)
+    function lineChar(angle) {
+      const d = ((angle % Math.PI) + Math.PI) % Math.PI;
+      if (d < Math.PI / 8 || d > 7 * Math.PI / 8) return "-";
+      if (d < 3 * Math.PI / 8) return "/";
+      if (d < 5 * Math.PI / 8) return "|";
+      return "\\";
+    }
+
+    // Draws a small text picture, tilted by "angle", with its bottom center at (x, y)
+    function stamp(lines, x, y, angle, color) {
+      const n = lines.length;
+      lines.forEach((line, i) => {
+        const h = n - 1 - i + 0.5;
+        const shift = h * Math.tan(angle);
+        for (let j = 0; j < line.length; j++) {
+          if (line[j] === " ") continue;
+          plot(x + shift + (j - (line.length - 1) / 2) * CW, y - h, line[j], color);
+        }
+      });
+    }
+
+    // ===== FLOWER PARTS =====
+    // A stem that leans (lean) and bends with the wind (bend)
+    function stemPoint(f, s) {
+      return {
+        x: f.baseX + f.lean * s * f.length + f.bend * s * s,
+        y: f.baseY - s * f.length
+      };
+    }
+
+    function drawStem(f) {
+      for (let row = 0; row < ROWS; row++) {
+        const y = row + 0.5;
+        const s = (f.baseY - y) / f.length;
+        if (s < 0 || s > 1) continue;
+        const x = f.baseX + f.lean * s * f.length + f.bend * s * s;
+        const slope = f.lean + 2 * f.bend * s / f.length;
+        const ch = slope > 0.22 ? "/" : slope < -0.22 ? "\\" : "|";
+        plot(x, y, ch, COLORS.stem);
+        if (f.thick) plot(x + CW, y, ch, COLORS.stem);
+      }
+    }
+
+    function drawLeaf(f, leaf, t) {
+      const p = stemPoint(f, leaf.at);
+      const flutter = 0.05 * Math.sin(2.3 * t + leaf.at * 10);
+      // Wind lifts leaves pointing left and pushes down leaves pointing right
+      const ang = leaf.angle - leaf.side * 0.15 * wind(t, p.x) + flutter;
+      const dir = { x: leaf.side * Math.cos(ang), y: -Math.sin(ang) };
+      const perp = { x: -dir.y, y: dir.x };
+      const rib = lineChar(Math.atan2(Math.sin(ang), leaf.side * Math.cos(ang)));
+
+      const r0 = Math.floor(p.y - leaf.length - 1), r1 = Math.ceil(p.y + leaf.length + 1);
+      for (let row = r0; row <= r1; row++) {
+        for (let col = 0; col < COLS; col++) {
+          const x = col * CW + CW / 2, y = row + 0.5;
+          const vx = x - p.x, vy = y - p.y;
+          const along = vx * dir.x + vy * dir.y;
+          const across = vx * perp.x + vy * perp.y;
+          if (along < 0.3 || along > leaf.length) continue;
+          const u = along / leaf.length;
+          const w = leaf.width * Math.sin(Math.PI * Math.pow(u, 0.8));
+          if (Math.abs(across) > w / 2) continue;
+          if (Math.abs(across) < 0.45) plot(x, y, rib, COLORS.rib);
+          else plot(x, y, "~", COLORS.leaf);
+        }
+      }
+    }
+
+    // Flower 1: a daisy-like head, seen from the front
+    function drawDaisyHead(f) {
+      const tip = stemPoint(f, 1);
+      const a = f.tilt;
+      stamp(["\\vVvVv/", " \\vVv/ "], tip.x, tip.y, a, COLORS.sepal);
+
+      const R = 7, rc = 2.3;
+      const d = 2.4 + R;
+      const cx = tip.x + d * Math.sin(a);
+      const cy = tip.y - d * Math.cos(a);
+
+      for (let row = Math.floor(cy - R - 1); row <= Math.ceil(cy + R + 1); row++) {
+        for (let col = 0; col < COLS; col++) {
+          const x = col * CW + CW / 2, y = row + 0.5;
+          const dx = x - cx, dy = y - cy;
+          if (Math.abs(dx) > R + 1) continue;
+          const lx = Math.cos(a) * dx + Math.sin(a) * dy;
+          const ly = -Math.sin(a) * dx + Math.cos(a) * dy;
+          const r = Math.hypot(lx, ly);
+          const th = Math.atan2(ly, lx);
+          const petalEdge = rc + (R - rc) * (0.3 + 0.7 * Math.pow(Math.abs(Math.cos(6 * th)), 0.6));
+          if (r <= rc * 0.55) plot(x, y, "@", COLORS.centerIn);
+          else if (r <= rc) plot(x, y, (row + col) % 2 ? "*" : "o", COLORS.centerOut);
+          else if (r <= petalEdge) plot(x, y, lineChar(Math.atan2(-dy, dx)), COLORS.petal);
+        }
+      }
+    }
+
+    // Flower 2: a tulip head
+    function drawTulipHead(f) {
+      const tip = stemPoint(f, 1);
+      const a = f.tilt;
+      stamp(["\\v/"], tip.x, tip.y, a, COLORS.sepal);
+      const up = 1;
+      stamp([
+        " /\\  /\\  /\\ ",
+        "/  \\/  \\/  \\",
+        "\\   \\  /   /",
+        " \\   \\/   / ",
+        "  \\      /  ",
+        "   '----'   "
+      ], tip.x + up * Math.sin(a), tip.y - up * Math.cos(a), a, COLORS.tulip);
+    }
+
+    // Grass blades that bend in the wind
+    const blades = [];
+    for (let i = 0; i < 70; i++) {
+      blades.push({ x: 6 + Math.random() * 42, h: 1 + Math.floor(Math.random() * 3) });
+    }
+
+    function drawGrass(t) {
+      blades.forEach(b => {
+        const w = wind(t, b.x);
+        for (let k = 0; k < b.h; k++) {
+          const lean = (k + 1) / b.h * w;
+          plot(b.x + lean * k * 0.6, ROWS - 0.5 - k, lean > 0.4 ? "/" : "|", COLORS.grass);
+        }
+      });
+    }
+
+    // ===== THE TWO FLOWERS =====
+    const daisy = {
+      baseX: 22, baseY: ROWS - 1, length: 40, lean: 0, thick: true, maxBend: 2.2,
+      leaves: [
+        { at: 0.25, side: -1, length: 8, width: 2.6, angle: 0.5 },
+        { at: 0.55, side: 1, length: 7, width: 2.2, angle: 0.55 }
+      ]
+    };
+
+    const tulip = {
+      baseX: 24.5, baseY: ROWS - 1, length: 22, lean: 0.4, thick: false, maxBend: 1.6,
+      leaves: [
+        { at: 0.4, side: 1, length: 5.5, width: 2, angle: 0.65 }
+      ]
+    };
+
+    function update(f, t) {
+      f.bend = f.maxBend * wind(t, f.baseX);
+      // Heads follow the wind fully, but only part of the lean, so their shapes stay readable
+      f.tilt = Math.atan(f.lean * 0.3 + 2 * f.bend / f.length);
+    }
+
+    function renderFrame(t) {
+      clearGrid();
+      update(daisy, t);
+      update(tulip, t);
+      [daisy, tulip].forEach(f => f.leaves.forEach(l => drawLeaf(f, l, t)));
+      drawStem(tulip);
+      drawStem(daisy);
+      drawTulipHead(tulip);
+      drawDaisyHead(daisy);
+      drawGrass(t);
+    }
+
+    // ===== SHOW IT ON THE PAGE =====
+    const pre = document.getElementById("flowers");
+
+    function escapeHtml(ch) {
+      return ch === "<" ? "&lt;" : ch === ">" ? "&gt;" : ch === "&" ? "&amp;" : ch;
+    }
+
+    function toHtml() {
+      let html = "";
+      for (let r = 0; r < ROWS; r++) {
+        let current = null;
+        for (let c = 0; c < COLS; c++) {
+          const color = chars[r][c] === " " ? current : colors[r][c];
+          if (color !== current) {
+            if (current) html += "</span>";
+            if (color) html += `<span style="color:${color}">`;
+            current = color;
+          }
+          html += escapeHtml(chars[r][c]);
+        }
+        if (current) html += "</span>";
+        html += "\n";
+      }
+      return html;
+    }
+
+    // Size the drawing to the screen (max 1000px)
+    function resize() {
+      const test = document.createElement("span");
+      test.style.cssText = "font:100px 'Courier New',Courier,monospace;position:absolute;visibility:hidden";
+      test.textContent = "M".repeat(10);
+      document.body.appendChild(test);
+      const ratio = test.getBoundingClientRect().width / 1000;
+      test.remove();
+
+      const maxWidth = Math.min(window.innerWidth * 0.94, MAX_SIZE);
+      const size = Math.min(maxWidth / (COLS * ratio), MAX_SIZE / ROWS);
+      pre.style.fontSize = size + "px";
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+
+    // Animate at about 30 frames per second
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let last = 0;
+    function loop(now) {
+      if (now - last > 33) {
+        renderFrame(now / 1000);
+        pre.innerHTML = toHtml();
+        last = now;
+      }
+      if (!reduceMotion) requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  </script>
+
+</body>
 </html>
